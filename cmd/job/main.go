@@ -36,6 +36,17 @@ var (
 	dynStore       *store.DynamoStore
 )
 
+func mustGet(ctx context.Context, sm *secret.Manager, key string) string {
+	v, err := sm.Get(ctx, key)
+	if err != nil {
+		log.Fatalf("init: SSM %q 조회 실패: %v", key, err)
+	}
+	if v == "" {
+		log.Fatalf("init: SSM %q 값이 비어 있습니다", key)
+	}
+	return v
+}
+
 func init() {
 	ctx := context.Background()
 	cfg, err := awscfg.LoadDefaultConfig(ctx)
@@ -45,11 +56,11 @@ func init() {
 	sm := secret.NewManager(cfg)
 	dynStore = store.NewDynamoStore(cfg)
 
-	rpcURL, _ = sm.Get(ctx, "asbg/RPC_URL")
-	privateKey, _ = sm.Get(ctx, "asbg/PRIVATE_KEY")
-	trackerAddress, _ = sm.Get(ctx, "asbg/ATTENDANCE_TRACKER_ADDRESS")
-	certAddress, _ = sm.Get(ctx, "asbg/CERTIFICATE_NFT_ADDRESS")
-	pinataJWT, _ = sm.Get(ctx, "asbg/PINATA_JWT")
+	rpcURL = mustGet(ctx, sm, "asbg/RPC_URL")
+	privateKey = mustGet(ctx, sm, "asbg/PRIVATE_KEY")
+	trackerAddress = mustGet(ctx, sm, "asbg/ATTENDANCE_TRACKER_ADDRESS")
+	certAddress = mustGet(ctx, sm, "asbg/CERTIFICATE_NFT_ADDRESS")
+	pinataJWT = mustGet(ctx, sm, "asbg/PINATA_JWT")
 }
 
 func Handler(ctx context.Context) error {
