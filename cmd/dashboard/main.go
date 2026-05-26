@@ -42,21 +42,21 @@ func init() {
 	trackerAddress, _ = sm.Get(ctx, "asbg/ATTENDANCE_TRACKER_ADDRESS")
 }
 
-func jsonResp(status int, body any) (events.APIGatewayProxyResponse, error) {
+func jsonResp(status int, body any) (events.APIGatewayV2HTTPResponse, error) {
 	b, _ := json.Marshal(body)
-	return events.APIGatewayProxyResponse{
+	return events.APIGatewayV2HTTPResponse{
 		StatusCode: status,
 		Headers:    map[string]string{"Content-Type": "application/json", "Access-Control-Allow-Origin": "*"},
 		Body:       string(b),
 	}, nil
 }
 
-func errResp(status int, msg string) (events.APIGatewayProxyResponse, error) {
+func errResp(status int, msg string) (events.APIGatewayV2HTTPResponse, error) {
 	return jsonResp(status, map[string]string{"error": msg})
 }
 
-func Handler(ctx context.Context, req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	switch req.HTTPMethod + " " + req.Path {
+func Handler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	switch req.RequestContext.HTTP.Method + " " + req.RawPath {
 	case "GET /members":
 		return handleMembers(ctx)
 	case "POST /mint":
@@ -74,7 +74,7 @@ type memberResponse struct {
 	Attendance string `json:"attendance"`
 }
 
-func handleMembers(ctx context.Context) (events.APIGatewayProxyResponse, error) {
+func handleMembers(ctx context.Context) (events.APIGatewayV2HTTPResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
@@ -132,7 +132,7 @@ type mintResult struct {
 	Error  string `json:"error,omitempty"`
 }
 
-func handleMint(ctx context.Context, body string) (events.APIGatewayProxyResponse, error) {
+func handleMint(ctx context.Context, body string) (events.APIGatewayV2HTTPResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 	defer cancel()
 
