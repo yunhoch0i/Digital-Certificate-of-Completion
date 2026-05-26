@@ -1,0 +1,49 @@
+# ── 빌드 산출물 ──────────────────────────────────────────────────────────────
+build/
+build_debug/
+cmake-build-debug/
+cmake-build-release/
+*.o
+*.a
+*.so
+*.dylib
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# ── 민감 정보 ─────────────────────────────────────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.*
+members.csv
+
+# ── Claude / AI 도구 ──────────────────────────────────────────────────────────
+.claude/
+CLAUDE.md
+Agent.md
+
+# ── IDE / 에디터 ──────────────────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── macOS 시스템 파일 ─────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ── 중간 데이터 캐시 ──────────────────────────────────────────────────────────
+data/encoded/
+data/benchmark_results.csv
+
+*.zip
+

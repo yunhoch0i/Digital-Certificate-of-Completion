@@ -1,0 +1,133 @@
+name: ASBG CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: ap-northeast-2
+  DASHBOARD_FUNCTION: asbg-dashboard
+  JOB_FUNCTION: asbg-job
+  STATIC_BUCKET: asbg-static
+
+# OIDC requires these two permissions — do not remove
+permissions:
+  id-token: write   # request OIDC JWT from GitHub
+  contents: read
+
+jobs:
+  # ── 1. Test ──────────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Foundry contract tests
+        working-directory: contracts
+        run: forge test -vv --match-path "test/*.t.sol"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Go build check
+        run: go build ./...
+
+  # ── 2. Deploy (main branch only) ─────────────────────────────────────────────
+  deploy:
+    name: Deploy to AWS
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      # OIDC: exchange GitHub JWT for AWS temporary credentials
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-asbg-deploy
+
+      # ── Build Lambda binaries ────────────────────────────────────────────────
+      - name: Build Dashboard Lambda
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
+            go build -o bootstrap ./cmd/dashboard/main.go
+          zip dashboard.zip bootstrap
+          rm bootstrap
+
+      - name: Build Job Lambda
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
+            go build -o bootstrap ./cmd/job/main.go
+          zip job.zip bootstrap
+          rm bootstrap
+
+      # ── Deploy Lambda functions ──────────────────────────────────────────────
+      - name: Deploy Dashboard Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ env.DASHBOARD_FUNCTION }} \
+            --zip-file fileb://dashboard.zip \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for Dashboard to be active
+        run: |
+          aws lambda wait function-updated-v2 \
+            --function-name ${{ env.DASHBOARD_FUNCTION }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deploy Job Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name ${{ env.JOB_FUNCTION }} \
+            --zip-file fileb://job.zip \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for Job to be active
+        run: |
+          aws lambda wait function-updated-v2 \
+            --function-name ${{ env.JOB_FUNCTION }} \
+            --region ${{ env.AWS_REGION }}
+
+      # ── Sync static dashboard ────────────────────────────────────────────────
+      - name: Upload dashboard.html to S3
+        run: |
+          aws s3 sync dashboard/ s3://${{ env.STATIC_BUCKET }}/ \
+            --region ${{ env.AWS_REGION }} \
+            --cache-control "max-age=3600" \
+            --delete
+
+      # ── Invalidate CloudFront cache (optional) ───────────────────────────────
+      - name: Invalidate CloudFront cache
+        if: ${{ secrets.CF_DISTRIBUTION_ID != '' }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CF_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Deployment summary
+        run: |
+          echo "### 배포 완료 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "- Dashboard Lambda: \`${{ env.DASHBOARD_FUNCTION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Job Lambda: \`${{ env.JOB_FUNCTION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Static bucket: \`s3://${{ env.STATIC_BUCKET }}\`" >> $GITHUB_STEP_SUMMARY

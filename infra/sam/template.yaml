@@ -1,0 +1,234 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: ASBG Attendance Token & Certificate NFT — Serverless stack
+
+Parameters:
+  TotalSessions:
+    Type: Number
+    Default: 10
+    Description: 이번 시즌 전체 모임 횟수
+
+Globals:
+  Function:
+    Runtime: provided.al2023
+    Architectures: [x86_64]
+    Environment:
+      Variables:
+        CHAIN_ID: "11155111"
+        CLUB_NAME: "AWS Student Builders Group"
+        DATA_BUCKET: !Ref DataBucket
+        TOTAL_SESSIONS: !Ref TotalSessions
+
+Resources:
+
+  # ── S3: 정적 파일 (dashboard.html) ───────────────────────────────────────────
+  StaticBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: asbg-static
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # CloudFront가 S3에 접근하기 위한 OAC
+  StaticBucketOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: asbg-static-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # S3 버킷 정책: CloudFront OAC만 허용
+  StaticBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${StaticBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+  # ── S3: 데이터 파일 (members.csv, 결과 파일) ──────────────────────────────────
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: asbg-data
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ── CloudFront 배포 ───────────────────────────────────────────────────────────
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: ASBG Dashboard
+        DefaultRootObject: dashboard.html
+        HttpVersion: http2
+        PriceClass: PriceClass_200  # 아시아 포함 (100은 미국/유럽만)
+
+        Origins:
+          # Origin 1: S3 정적 파일 (dashboard.html)
+          - Id: S3StaticOrigin
+            DomainName: !GetAtt StaticBucket.RegionalDomainName
+            S3OriginConfig: {}
+            OriginAccessControlId: !GetAtt StaticBucketOAC.Id
+
+          # Origin 2: API Gateway (Lambda)
+          - Id: ApiOrigin
+            DomainName: !Sub "${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+
+        DefaultCacheBehavior:
+          TargetOriginId: S3StaticOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized (AWS managed)
+          AllowedMethods: [GET, HEAD]
+
+        CacheBehaviors:
+          # /members, /mint → API Gateway로 포워드 (캐시 없음)
+          - PathPattern: /members
+            TargetOriginId: ApiOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled (AWS managed)
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac  # AllViewerExceptHostHeader
+            AllowedMethods: [GET, HEAD, OPTIONS]
+
+          - PathPattern: /mint
+            TargetOriginId: ApiOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+
+  # ── Dashboard Lambda ──────────────────────────────────────────────────────────
+  DashboardFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: asbg-dashboard
+      CodeUri: ../../dashboard.zip
+      Handler: bootstrap
+      Timeout: 30
+      MemorySize: 256
+      Role: !GetAtt LambdaRole.Arn
+      Events:
+        GetMembers:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /members
+            Method: GET
+        PostMint:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /mint
+            Method: POST
+
+  # ── Job Lambda ────────────────────────────────────────────────────────────────
+  JobFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: asbg-job
+      CodeUri: ../../job.zip
+      Handler: bootstrap
+      Timeout: 900
+      MemorySize: 512
+      Role: !GetAtt LambdaRole.Arn
+      Events:
+        YearlyTrigger:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 0 31 12 ? *)"
+            Name: asbg-yearly
+
+  # ── HTTP API (Lambda URL) ─────────────────────────────────────────────────────
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: asbg-api
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [Content-Type]
+
+  # ── IAM Role ──────────────────────────────────────────────────────────────────
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: asbg-lambda-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: asbg-lambda-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:asbg/*"
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource:
+                  - !Sub "${DataBucket.Arn}/*"
+              - Effect: Allow
+                Action: [dynamodb:PutItem, dynamodb:GetItem]
+                Resource: !GetAtt TxHistoryTable.Arn
+
+  # ── DynamoDB ──────────────────────────────────────────────────────────────────
+  TxHistoryTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: asbg-tx-history
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tx_hash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tx_hash
+          KeyType: HASH
+
+Outputs:
+  CloudFrontURL:
+    Description: 대시보드 URL (CloudFront)
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+
+  ApiEndpoint:
+    Description: API Gateway 엔드포인트
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+
+  StaticBucketName:
+    Description: 정적 파일 S3 버킷
+    Value: !Ref StaticBucket
+
+  DataBucketName:
+    Description: 데이터 파일 S3 버킷
+    Value: !Ref DataBucket
+
+  CloudFrontDistributionId:
+    Description: CloudFront Distribution ID (GitHub Secret CF_DISTRIBUTION_ID에 등록)
+    Value: !Ref CloudFrontDistribution
