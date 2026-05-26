@@ -210,8 +210,8 @@ Resources:
             Version: "2012-10-17"
             Statement:
               - Effect: Allow
-                Action: secretsmanager:GetSecretValue
-                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:asbg/*"
+                Action: ssm:GetParameter
+                Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/asbg/*"
               - Effect: Allow
                 Action: [s3:GetObject, s3:PutObject]
                 Resource:

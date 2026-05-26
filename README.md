@@ -1,5 +1,10 @@
 # ASBG 수료 인증서 시스템
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Network: Sepolia](https://img.shields.io/badge/Network-Sepolia-blue)
+![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)
+![Solidity](https://img.shields.io/badge/Solidity-0.8.24-363636?logo=solidity)
+
 AWS Student Builders Group(ASBG) 동아리의 출석을 블록체인에 기록하고,
 NFT 수료 인증서를 자동 발급하는 시스템입니다.
 
