@@ -111,6 +111,13 @@ Resources:
             OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac  # AllViewerExceptHostHeader
             AllowedMethods: [GET, HEAD, OPTIONS]
 
+          - PathPattern: /certificates
+            TargetOriginId: ApiOrigin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad  # CachingDisabled
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac  # AllViewerExceptHostHeader
+            AllowedMethods: [GET, HEAD, OPTIONS]
+
           - PathPattern: /mint
             TargetOriginId: ApiOrigin
             ViewerProtocolPolicy: redirect-to-https
@@ -128,12 +135,21 @@ Resources:
       Timeout: 30
       MemorySize: 256
       Role: !GetAtt LambdaRole.Arn
+      Environment:
+        Variables:
+          JOB_FUNCTION_NAME: asbg-job
       Events:
         GetMembers:
           Type: HttpApi
           Properties:
             ApiId: !Ref HttpApi
             Path: /members
+            Method: GET
+        GetCertificates:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /certificates
             Method: GET
         PostMint:
           Type: HttpApi
@@ -198,6 +214,9 @@ Resources:
               - Effect: Allow
                 Action: [dynamodb:PutItem, dynamodb:GetItem]
                 Resource: !GetAtt TxHistoryTable.Arn
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:asbg-job"
 
   # ── DynamoDB ──────────────────────────────────────────────────────────────────
   TxHistoryTable:

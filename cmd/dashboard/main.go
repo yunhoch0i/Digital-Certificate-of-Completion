@@ -7,16 +7,22 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	lambdasdk "github.com/aws/aws-sdk-go-v2/service/lambda"
+	lambdatypes "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/ethereum/go-ethereum/common"
 
 	atk "asbg-token/bindings/attendance_tracker"
+	cnft "asbg-token/bindings/certificate_nft"
 	"asbg-token/internal/blockchain"
 	"asbg-token/internal/members"
+	"asbg-token/internal/metadata"
 	"asbg-token/internal/secret"
 	"asbg-token/internal/store"
 )
@@ -25,6 +31,7 @@ var (
 	rpcURL         string
 	privateKey     string
 	trackerAddress string
+	certNFTAddress string
 	dynStore       *store.DynamoStore
 )
 
@@ -40,6 +47,7 @@ func init() {
 	rpcURL, _ = sm.Get(ctx, "asbg/RPC_URL")
 	privateKey, _ = sm.Get(ctx, "asbg/PRIVATE_KEY")
 	trackerAddress, _ = sm.Get(ctx, "asbg/ATTENDANCE_TRACKER_ADDRESS")
+	certNFTAddress, _ = sm.Get(ctx, "asbg/CERTIFICATE_NFT_ADDRESS")
 }
 
 func jsonResp(status int, body any) (events.APIGatewayV2HTTPResponse, error) {
@@ -59,6 +67,8 @@ func Handler(ctx context.Context, req events.APIGatewayV2HTTPRequest) (events.AP
 	switch req.RequestContext.HTTP.Method + " " + req.RawPath {
 	case "GET /members":
 		return handleMembers(ctx)
+	case "GET /certificates":
+		return handleCertificates(ctx)
 	case "POST /mint":
 		return handleMint(ctx, req.Body)
 	}
@@ -114,6 +124,97 @@ func handleMembers(ctx context.Context) (events.APIGatewayV2HTTPResponse, error)
 			Role:       m.Role,
 			Attendance: attStr,
 		})
+	}
+	return jsonResp(200, resp)
+}
+
+// ── GET /certificates ─────────────────────────────────────────────────────────
+
+type certResponse struct {
+	ID           uint    `json:"id"`
+	Name         string  `json:"name"`
+	Role         string  `json:"role"`
+	Attendance   int64   `json:"attendance"`
+	TotalSessions int    `json:"total_sessions"`
+	Threshold    int     `json:"threshold"`
+	Certified    bool    `json:"certified"`
+	TokenID      *uint64 `json:"token_id,omitempty"`
+	TokenURI     string  `json:"token_uri,omitempty"`
+}
+
+func handleCertificates(ctx context.Context) (events.APIGatewayV2HTTPResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	awsCfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return errResp(500, "aws config: "+err.Error())
+	}
+	bucket := os.Getenv("DATA_BUCKET")
+	if bucket == "" {
+		bucket = "asbg-data"
+	}
+	mems, err := members.LoadFromS3(ctx, awsCfg, bucket, "members.csv")
+	if err != nil {
+		return errResp(500, "load members: "+err.Error())
+	}
+
+	totalSessions, _ := strconv.Atoi(os.Getenv("TOTAL_SESSIONS"))
+	if totalSessions == 0 {
+		totalSessions = 10
+	}
+	threshold := metadata.CalcThreshold(totalSessions)
+
+	client, err := blockchain.NewClient(rpcURL, privateKey)
+	if err != nil {
+		return errResp(500, "blockchain client: "+err.Error())
+	}
+
+	trackerAddr := common.HexToAddress(trackerAddress)
+	tracker, err := atk.NewAttendanceTracker(trackerAddr, client.Eth())
+	if err != nil {
+		return errResp(500, "bind tracker: "+err.Error())
+	}
+
+	certAddr := common.HexToAddress(certNFTAddress)
+	certContract, err := cnft.NewCertificateNFT(certAddr, client.Eth())
+	if err != nil {
+		return errResp(500, "bind cert nft: "+err.Error())
+	}
+
+	resp := make([]certResponse, 0, len(mems))
+	for _, m := range mems {
+		bal, _ := tracker.Attendance(nil, big.NewInt(int64(m.ID)))
+		att := int64(0)
+		if bal != nil {
+			att = bal.Int64()
+		}
+
+		certified, _ := certContract.HasCertificate(nil, big.NewInt(int64(m.ID)))
+
+		cr := certResponse{
+			ID:           m.ID,
+			Name:         m.Name,
+			Role:         m.Role,
+			Attendance:   att,
+			TotalSessions: totalSessions,
+			Threshold:    threshold,
+			Certified:    certified,
+		}
+
+		if certified {
+			tokenId, err := certContract.MemberTokenId(nil, big.NewInt(int64(m.ID)))
+			if err == nil && tokenId != nil {
+				tid := tokenId.Uint64()
+				cr.TokenID = &tid
+				uri, err := certContract.TokenURI(nil, tokenId)
+				if err == nil {
+					cr.TokenURI = uri
+				}
+			}
+		}
+
+		resp = append(resp, cr)
 	}
 	return jsonResp(200, resp)
 }
@@ -208,6 +309,9 @@ func handleMint(ctx context.Context, body string) (events.APIGatewayV2HTTPRespon
 		})
 	}
 
+	// Mint 성공 → Job Lambda를 비동기로 트리거해 수료 기준 달성자에게 인증서 자동 발급
+	invokeCertJob()
+
 	// log each member
 	var successes []mintResult
 	for _, id := range req.Present {
@@ -223,6 +327,32 @@ func handleMint(ctx context.Context, body string) (events.APIGatewayV2HTTPRespon
 	}
 
 	return jsonResp(200, map[string]any{"success": successes, "failed": []any{}})
+}
+
+// invokeCertJob triggers the Job Lambda asynchronously (fire-and-forget).
+// Returns immediately — certificate issuance happens in the background.
+func invokeCertJob() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Printf("invokeCertJob: aws config: %v", err)
+		return
+	}
+	name := os.Getenv("JOB_FUNCTION_NAME")
+	if name == "" {
+		name = "asbg-job"
+	}
+	client := lambdasdk.NewFromConfig(cfg)
+	_, err = client.Invoke(ctx, &lambdasdk.InvokeInput{
+		FunctionName:   aws.String(name),
+		InvocationType: lambdatypes.InvocationTypeEvent, // async — returns instantly
+	})
+	if err != nil {
+		log.Printf("invokeCertJob: %v", err)
+	} else {
+		log.Printf("certificate job triggered (async)")
+	}
 }
 
 func main() {

@@ -6,7 +6,7 @@ resolve_s3 = true
 s3_prefix = "asbg"
 region = "ap-northeast-2"
 confirm_changeset = true
-capabilities = "CAPABILITY_IAM"
+capabilities = "CAPABILITY_NAMED_IAM"
 disable_rollback = true
 parameter_overrides = "TotalSessions=\"10\""
 image_repositories = []
