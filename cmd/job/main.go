@@ -108,7 +108,13 @@ func Handler(ctx context.Context) error {
 			continue
 		}
 
-		credURL := fmt.Sprintf("https://sepolia.etherscan.io/token/%s?a=", certAddress)
+		cloudfrontURL := os.Getenv("CLOUDFRONT_URL")
+		var credURL string
+		if cloudfrontURL != "" {
+			credURL = fmt.Sprintf("%s/certificate.html?member=%d", cloudfrontURL, m.ID)
+		} else {
+			credURL = fmt.Sprintf("https://sepolia.etherscan.io/token/%s?a=%d", certAddress, m.ID)
+		}
 		meta := metadata.Build(metadata.CertParams{
 			MemberName:      m.Name,
 			Role:            m.Role,

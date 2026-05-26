@@ -7,79 +7,56 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root { --aws-orange: #FF9900; --aws-dark: #232F3E; }
-
     body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
 
-    /* 역할 배지 */
     .badge-leader      { background:#FFF3CD; color:#856404; border:1px solid #FFEAA7; }
     .badge-core-member { background:#CCE5FF; color:#004085; border:1px solid #B8DAFF; }
     .badge-member      { background:#E2E3E5; color:#383D41; border:1px solid #D6D8DB; }
 
-    /* 멤버 카드 */
     .member-card {
-      background: white;
-      border-radius: 12px;
-      border: 2px solid #e5e7eb;
-      padding: 1.25rem;
-      cursor: pointer;
-      transition: all 0.2s;
-      position: relative;
+      background: white; border-radius: 12px; border: 2px solid #e5e7eb;
+      padding: 1.25rem; cursor: pointer; transition: all 0.2s; position: relative;
     }
     .member-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
-    .member-card.certified {
-      border-color: #FF9900;
-      box-shadow: 0 0 0 1px rgba(255,153,0,0.3);
-    }
+    .member-card.certified { border-color: #FF9900; box-shadow: 0 0 0 1px rgba(255,153,0,0.3); }
     .member-card.certified:hover { box-shadow: 0 8px 24px rgba(255,153,0,0.25); }
 
-    /* 출석 진행 바 */
     .progress-bar { height: 6px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
     .progress-fill { height: 100%; border-radius: 99px; transition: width 0.6s ease; }
     .progress-fill.pass { background: #22c55e; }
     .progress-fill.fail { background: #94a3b8; }
 
-    /* 수료 배지 */
     .cert-badge-pass { background:#DCFCE7; color:#166534; border:1px solid #BBF7D0; }
     .cert-badge-fail { background:#F1F5F9; color:#64748B; border:1px solid #E2E8F0; }
 
     /* 모달 */
     .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.6);
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
       display: flex; align-items: center; justify-content: center;
       z-index: 50; padding: 1rem;
       opacity: 0; pointer-events: none; transition: opacity 0.2s;
     }
     .modal-overlay.open { opacity: 1; pointer-events: auto; }
     .modal-box {
-      background: white; border-radius: 16px;
-      max-width: 540px; width: 100%;
+      background: white; border-radius: 16px; max-width: 520px; width: 100%;
       transform: scale(0.95); transition: transform 0.2s;
       max-height: 90vh; overflow-y: auto;
     }
     .modal-overlay.open .modal-box { transform: scale(1); }
 
-    /* 수료 인증서 카드 디자인 */
+    /* 수료 인증서 카드 */
     .certificate-card {
-      border: 3px solid #FF9900;
-      border-radius: 12px;
-      padding: 2rem;
+      border: 3px solid #FF9900; border-radius: 12px; padding: 2rem;
       background: linear-gradient(135deg, #fffdf7 0%, #fff8ec 100%);
-      position: relative;
-      text-align: center;
+      position: relative; text-align: center;
     }
     .certificate-card::before {
-      content: '';
-      position: absolute; inset: 6px;
-      border: 1px solid rgba(255,153,0,0.3);
-      border-radius: 8px; pointer-events: none;
+      content: ''; position: absolute; inset: 6px;
+      border: 1px solid rgba(255,153,0,0.3); border-radius: 8px; pointer-events: none;
     }
 
     /* 섹션 구분선 */
-    .section-header {
-      display: flex; align-items: center; gap: 0.75rem;
-      margin-bottom: 1.25rem;
-    }
+    .section-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem; }
     .section-line { flex: 1; height: 2px; background: #e5e7eb; border-radius: 99px; }
 
     /* 로딩 스피너 */
@@ -89,11 +66,26 @@
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* 공유 페이지 전용 인증서 */
+    .share-cert {
+      border: 4px solid #FF9900; border-radius: 16px;
+      background: linear-gradient(135deg, #fffdf7 0%, #fff8ec 100%);
+      position: relative; text-align: center; padding: 2.5rem 2rem;
+    }
+    .share-cert::before {
+      content: ''; position: absolute; inset: 8px;
+      border: 1px solid rgba(255,153,0,0.4); border-radius: 10px; pointer-events: none;
+    }
+    .share-badge {
+      display: inline-block; padding: 0.2rem 0.6rem; border-radius: 99px;
+      font-size: 0.75rem; font-weight: 600;
+    }
   </style>
 </head>
 <body>
 
-<!-- ── 헤더 ─────────────────────────────────────────────────────────────── -->
+<!-- ── 헤더 ──────────────────────────────────────────────────────────────── -->
 <header style="background:var(--aws-dark);" class="text-white px-6 py-5">
   <div class="max-w-5xl mx-auto flex items-center justify-between flex-wrap gap-3">
     <div>
@@ -103,20 +95,14 @@
       </div>
       <p class="text-sm text-gray-400">AWS Student Builders Group</p>
     </div>
-    <div class="flex items-center gap-3">
-      <div id="header-stats" class="text-right text-sm text-gray-400 hidden">
-        <div id="stat-sessions"></div>
-        <div id="stat-certified"></div>
-      </div>
-      <a href="/dashboard.html"
-         class="text-sm px-4 py-2 rounded-lg border border-gray-600 hover:border-gray-400 transition-colors">
-        ← 대시보드
-      </a>
+    <div id="header-stats" class="text-right text-sm text-gray-400 hidden">
+      <div id="stat-sessions"></div>
+      <div id="stat-certified"></div>
     </div>
   </div>
 </header>
 
-<!-- ── 메인 콘텐츠 ─────────────────────────────────────────────────────── -->
+<!-- ── 메인 ──────────────────────────────────────────────────────────────── -->
 <main class="max-w-5xl mx-auto px-4 py-8">
 
   <!-- 로딩 -->
@@ -129,51 +115,63 @@
   <div id="error-view" class="hidden text-center py-24">
     <p class="text-4xl mb-3">⚠️</p>
     <p class="text-gray-600" id="error-msg"></p>
-    <button onclick="load()" class="mt-4 px-5 py-2 rounded-lg text-sm font-medium"
-            style="background:var(--aws-orange); color:white;">다시 시도</button>
+    <button onclick="init()"
+            class="mt-4 px-5 py-2 rounded-lg text-sm font-medium text-white"
+            style="background:var(--aws-orange);">다시 시도</button>
   </div>
 
-  <!-- 멤버 목록 -->
+  <!-- ── 공유 URL 개인 수료증 뷰 (?member=ID) ──────────────────────────── -->
+  <div id="share-view" class="hidden max-w-lg mx-auto">
+    <div id="share-content"></div>
+    <div class="text-center mt-6">
+      <a href="/certificate.html"
+         class="text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2">
+        ← 전체 수료 현황 보기
+      </a>
+    </div>
+  </div>
+
+  <!-- ── 전체 멤버 목록 ──────────────────────────────────────────────────── -->
   <div id="members-view" class="hidden space-y-10">
 
-    <!-- Leader -->
     <section id="section-leader" class="hidden">
       <div class="section-header">
         <span class="text-base font-bold text-amber-600 whitespace-nowrap">👑 Leader</span>
         <div class="section-line"></div>
         <span id="count-leader" class="text-sm text-gray-400 whitespace-nowrap"></span>
       </div>
-      <div id="grid-leader" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));"></div>
+      <div id="grid-leader" class="grid gap-4"
+           style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));"></div>
     </section>
 
-    <!-- Core Member -->
     <section id="section-core-member" class="hidden">
       <div class="section-header">
         <span class="text-base font-bold text-blue-600 whitespace-nowrap">⭐ Core Member</span>
         <div class="section-line"></div>
         <span id="count-core-member" class="text-sm text-gray-400 whitespace-nowrap"></span>
       </div>
-      <div id="grid-core-member" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));"></div>
+      <div id="grid-core-member" class="grid gap-4"
+           style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));"></div>
     </section>
 
-    <!-- Member -->
     <section id="section-member" class="hidden">
       <div class="section-header">
         <span class="text-base font-bold text-gray-600 whitespace-nowrap">👤 Member</span>
         <div class="section-line"></div>
         <span id="count-member" class="text-sm text-gray-400 whitespace-nowrap"></span>
       </div>
-      <div id="grid-member" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));"></div>
+      <div id="grid-member" class="grid gap-4"
+           style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));"></div>
     </section>
 
   </div>
 </main>
 
-<!-- ── 모달 ─────────────────────────────────────────────────────────────── -->
+<!-- ── 모달 ──────────────────────────────────────────────────────────────── -->
 <div id="modal" class="modal-overlay" onclick="closeModal(event)">
   <div class="modal-box p-6" onclick="event.stopPropagation()">
     <div class="flex justify-end mb-2">
-      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 text-xl leading-none">✕</button>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 text-xl">✕</button>
     </div>
     <div id="modal-content"></div>
   </div>
@@ -183,70 +181,175 @@
   const CONTRACT_ADDR = '0xF5E07d95461f076BF7567666eAf354ba4460953a';
   let allMembers = [];
 
-  // ── 데이터 로드 ─────────────────────────────────────────────────────────
-  async function load() {
-    show('loading');
+  // ── 진입점 ──────────────────────────────────────────────────────────────
+  async function init() {
+    const params   = new URLSearchParams(window.location.search);
+    const memberId = params.get('member');
+
+    showOnly('loading');
     try {
       const res = await fetch('/certificates');
       if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
       allMembers = await res.json();
-      renderAll(allMembers);
-      show('members-view');
+
+      if (memberId !== null) {
+        renderShareView(parseInt(memberId, 10));
+      } else {
+        renderListView(allMembers);
+      }
     } catch (e) {
       document.getElementById('error-msg').textContent = e.message;
-      show('error-view');
+      showOnly('error-view');
     }
   }
 
-  function show(id) {
-    ['loading','error-view','members-view'].forEach(s =>
-      document.getElementById(s).classList.toggle('hidden', s !== id)
-    );
+  function showOnly(id) {
+    ['loading', 'error-view', 'share-view', 'members-view']
+      .forEach(s => document.getElementById(s).classList.toggle('hidden', s !== id));
   }
 
-  // ── 렌더링 ──────────────────────────────────────────────────────────────
-  function renderAll(members) {
-    const groups = { 'Leader': [], 'Core Member': [], 'Member': [] };
-    members.forEach(m => (groups[m.role] || groups['Member']).push(m));
+  // ── 공유 URL 개인 수료증 ─────────────────────────────────────────────────
+  function renderShareView(id) {
+    const m = allMembers.find(x => x.id === id);
+    showOnly('share-view');
 
-    const totalCertified = members.filter(m => m.certified).length;
-    const totalSessions  = members[0]?.total_sessions ?? 0;
-    const threshold      = members[0]?.threshold ?? 0;
+    if (!m) {
+      document.getElementById('share-content').innerHTML =
+        '<p class="text-center text-gray-500 py-12">해당 멤버의 수료증을 찾을 수 없습니다.</p>';
+      return;
+    }
+
+    if (!m.certified) {
+      const pct  = m.total_sessions > 0 ? Math.round(m.attendance / m.total_sessions * 100) : 0;
+      const lack = Math.max(0, m.threshold - m.attendance);
+      document.getElementById('share-content').innerHTML = `
+        <div class="text-center py-8 bg-white rounded-2xl border border-gray-200 px-6">
+          <div class="text-5xl mb-3">${roleIcon(m.role)}</div>
+          <div class="text-2xl font-bold mb-1">${m.name}</div>
+          <span class="share-badge mb-6 inline-block ${roleBadge(m.role)}">${m.role}</span>
+          <p class="text-gray-500 mt-4">아직 수료 기준(${m.threshold}회)을 달성하지 못했습니다.</p>
+          <p class="text-sm text-gray-400 mt-1">현재 출석: ${m.attendance}회 / 부족: ${lack}회</p>
+          <div class="progress-bar mt-4"><div class="progress-fill fail" style="width:${pct}%"></div></div>
+        </div>`;
+      return;
+    }
+
+    // 수료 인증서 공유 뷰
+    const pct          = m.total_sessions > 0 ? Math.round(m.attendance / m.total_sessions * 100) : 0;
+    const etherscanUrl = `https://sepolia.etherscan.io/token/${CONTRACT_ADDR}?a=${m.token_id}`;
+    const shareUrl     = `${location.origin}/certificate.html?member=${m.id}`;
+
+    document.getElementById('share-content').innerHTML = `
+      <div class="share-cert mb-6" id="share-cert-card">
+        <div class="text-xs text-gray-400 font-semibold tracking-widest uppercase mb-3">
+          AWS Student Builders Group
+        </div>
+        <div class="text-lg font-bold text-gray-600 mb-1">ASBG 수료 인증서</div>
+        <div class="w-14 h-0.5 mx-auto mb-5" style="background:var(--aws-orange);"></div>
+
+        <div class="text-4xl font-bold text-gray-900 mb-2">${m.name}</div>
+        <span class="share-badge mb-5 inline-block ${roleBadge(m.role)}">${m.role}</span>
+
+        <div class="grid grid-cols-2 gap-3 text-sm text-left mt-2 mb-4">
+          <div class="bg-white rounded-lg p-3 border border-amber-100">
+            <div class="text-gray-400 text-xs mb-0.5">출석 횟수</div>
+            <div class="font-bold text-gray-800">${m.attendance} / ${m.total_sessions}</div>
+          </div>
+          <div class="bg-white rounded-lg p-3 border border-amber-100">
+            <div class="text-gray-400 text-xs mb-0.5">수료 기준</div>
+            <div class="font-bold text-gray-800">${m.threshold}회 이상</div>
+          </div>
+          <div class="bg-white rounded-lg p-3 border border-amber-100">
+            <div class="text-gray-400 text-xs mb-0.5">Token ID</div>
+            <div class="font-bold text-gray-800">#${m.token_id}</div>
+          </div>
+          <div class="bg-white rounded-lg p-3 border border-amber-100">
+            <div class="text-gray-400 text-xs mb-0.5">발급일</div>
+            <div class="font-bold text-gray-800" id="share-issued-date">—</div>
+          </div>
+        </div>
+
+        <div class="mb-1 flex justify-between text-xs text-gray-500">
+          <span>출석률</span><span>${pct}%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill pass" style="width:${pct}%"></div>
+        </div>
+
+        <p class="text-xs text-gray-400 mt-4">
+          Ethereum Sepolia 블록체인에 영구 기록된 인증서입니다.
+        </p>
+      </div>
+
+      <!-- 액션 버튼 -->
+      <div class="space-y-3">
+        <button id="linkedin-btn" onclick="addToLinkedIn(${m.id})"
+                class="w-full py-3 rounded-xl font-semibold text-white text-sm flex items-center justify-center gap-2"
+                style="background:#0A66C2;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+          </svg>
+          LinkedIn에 추가
+        </button>
+
+        <div class="flex gap-3">
+          <a href="${etherscanUrl}" target="_blank" rel="noopener"
+             class="flex-1 py-2.5 rounded-xl text-sm font-medium border border-gray-300
+                    hover:border-gray-500 transition-colors text-gray-700 text-center">
+            🔗 Etherscan 검증
+          </a>
+          <button onclick="copyUrl('${shareUrl}')"
+                  class="flex-1 py-2.5 rounded-xl text-sm font-medium border border-gray-300
+                         hover:border-gray-500 transition-colors text-gray-700"
+                  id="copy-btn">
+            📋 URL 복사
+          </button>
+        </div>
+      </div>`;
+
+    // IPFS 메타데이터 비동기 로드 → 발급일 + LinkedIn 버튼 업데이트
+    if (m.token_uri) fetchIpfsMetaForShare(m);
+  }
+
+  // ── 전체 멤버 목록 ───────────────────────────────────────────────────────
+  function renderListView(members) {
+    const groups       = { 'Leader': [], 'Core Member': [], 'Member': [] };
+    const totalCert    = members.filter(m => m.certified).length;
+    const totalSessions = members[0]?.total_sessions ?? 0;
+    const threshold    = members[0]?.threshold ?? 0;
+
+    members.forEach(m => (groups[m.role] || groups['Member']).push(m));
 
     document.getElementById('stat-sessions').textContent =
       `전체 ${totalSessions}회 | 수료 기준 ${threshold}회 (90%)`;
     document.getElementById('stat-certified').textContent =
-      `수료 ${totalCertified}명 / 전체 ${members.length}명`;
+      `수료 ${totalCert}명 / 전체 ${members.length}명`;
     document.getElementById('header-stats').classList.remove('hidden');
 
     renderSection('leader',      groups['Leader']);
     renderSection('core-member', groups['Core Member']);
     renderSection('member',      groups['Member']);
+    showOnly('members-view');
   }
 
   function renderSection(key, members) {
-    const section = document.getElementById(`section-${key}`);
-    const grid    = document.getElementById(`grid-${key}`);
-    const count   = document.getElementById(`count-${key}`);
     if (!members.length) return;
-
     const certified = members.filter(m => m.certified).length;
-    count.textContent = `${certified}명 수료 / ${members.length}명`;
-    grid.innerHTML = members.map(m => cardHTML(m)).join('');
-    section.classList.remove('hidden');
+    document.getElementById(`count-${key}`).textContent = `${certified}명 수료 / ${members.length}명`;
+    document.getElementById(`grid-${key}`).innerHTML    = members.map(cardHTML).join('');
+    document.getElementById(`section-${key}`).classList.remove('hidden');
   }
 
   function cardHTML(m) {
-    const pct   = m.total_sessions > 0 ? Math.round(m.attendance / m.total_sessions * 100) : 0;
-    const pass  = m.certified;
-    const badge = roleBadge(m.role);
+    const pct  = m.total_sessions > 0 ? Math.round(m.attendance / m.total_sessions * 100) : 0;
+    const pass = m.certified;
     return `
       <div class="member-card ${pass ? 'certified' : ''}" onclick="openModal(${m.id})">
         ${pass ? '<div class="absolute top-2 right-2 text-lg">🏆</div>' : ''}
         <div class="text-center mb-3">
           <div class="text-3xl mb-2">${roleIcon(m.role)}</div>
           <div class="font-bold text-gray-900 text-sm">${m.name}</div>
-          <span class="inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium ${badge}">${m.role}</span>
+          <span class="inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium ${roleBadge(m.role)}">${m.role}</span>
         </div>
         <div class="mb-1 flex justify-between text-xs text-gray-500">
           <span>출석</span>
@@ -263,7 +366,7 @@
       </div>`;
   }
 
-  // ── 모달 ────────────────────────────────────────────────────────────────
+  // ── 모달 (목록에서 카드 클릭 시) ────────────────────────────────────────
   function openModal(id) {
     const m = allMembers.find(x => x.id === id);
     if (!m) return;
@@ -272,9 +375,7 @@
       : notCertifiedModal(m);
     document.getElementById('modal').classList.add('open');
     document.body.style.overflow = 'hidden';
-
-    // 수료자 → IPFS 메타데이터 비동기 로드
-    if (m.certified && m.token_uri) fetchIpfsMeta(m);
+    if (m.certified && m.token_uri) fetchIpfsMetaForModal(m);
   }
 
   function closeModal(e) {
@@ -285,9 +386,9 @@
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
   function certifiedModal(m) {
+    const pct          = m.total_sessions > 0 ? Math.round(m.attendance / m.total_sessions * 100) : 0;
     const etherscanUrl = `https://sepolia.etherscan.io/token/${CONTRACT_ADDR}?a=${m.token_id}`;
-    const openseaUrl   = `https://testnets.opensea.io/assets/sepolia/${CONTRACT_ADDR}/${m.token_id}`;
-    const pct = m.total_sessions > 0 ? Math.round(m.attendance / m.total_sessions * 100) : 0;
+    const shareUrl     = `${location.origin}/certificate.html?member=${m.id}`;
     return `
       <div class="certificate-card mb-5">
         <div class="text-xs text-gray-400 font-semibold tracking-widest uppercase mb-3">AWS Student Builders Group</div>
@@ -308,9 +409,9 @@
             <div class="text-gray-400 text-xs mb-0.5">Token ID</div>
             <div class="font-bold text-gray-800">#${m.token_id}</div>
           </div>
-          <div class="bg-white rounded-lg p-3 border border-amber-100" id="modal-date-box">
+          <div class="bg-white rounded-lg p-3 border border-amber-100">
             <div class="text-gray-400 text-xs mb-0.5">발급일</div>
-            <div class="font-bold text-gray-800" id="modal-issued-date">로딩 중...</div>
+            <div class="font-bold text-gray-800" id="modal-issued-date">—</div>
           </div>
         </div>
         <div class="mb-1 flex justify-between text-xs text-gray-500">
@@ -320,16 +421,27 @@
           <div class="progress-fill pass" style="width:${pct}%"></div>
         </div>
       </div>
-      <div class="flex gap-3">
-        <a href="${etherscanUrl}" target="_blank" rel="noopener"
-           class="flex-1 text-center text-sm py-2.5 rounded-lg font-medium border border-gray-300 hover:border-gray-500 transition-colors text-gray-700">
-          🔗 Etherscan
-        </a>
-        <a href="${openseaUrl}" target="_blank" rel="noopener"
-           class="flex-1 text-center text-sm py-2.5 rounded-lg font-medium text-white transition-colors"
-           style="background:var(--aws-orange);">
-          🖼 OpenSea
-        </a>
+      <div class="space-y-2">
+        <button id="modal-linkedin-btn" onclick="addToLinkedIn(${m.id})"
+                class="w-full py-2.5 rounded-lg font-semibold text-white text-sm flex items-center justify-center gap-2"
+                style="background:#0A66C2;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+          </svg>
+          LinkedIn에 추가
+        </button>
+        <div class="flex gap-2">
+          <a href="${etherscanUrl}" target="_blank" rel="noopener"
+             class="flex-1 py-2 rounded-lg text-sm font-medium border border-gray-300
+                    hover:border-gray-500 transition-colors text-gray-700 text-center">
+            🔗 Etherscan
+          </a>
+          <button onclick="copyUrl('${shareUrl}')" id="modal-copy-btn"
+                  class="flex-1 py-2 rounded-lg text-sm font-medium border border-gray-300
+                         hover:border-gray-500 transition-colors text-gray-700">
+            📋 공유 URL 복사
+          </button>
+        </div>
       </div>`;
   }
 
@@ -367,20 +479,69 @@
       </div>`;
   }
 
-  // ── IPFS 메타데이터 비동기 로드 ─────────────────────────────────────────
-  async function fetchIpfsMeta(m) {
+  // ── LinkedIn "Add to Profile" 딥링크 ────────────────────────────────────
+  // issuedDate가 로드되면 _linkedInMeta[id]에 저장 후 버튼에 반영
+  const _linkedInMeta = {};
+
+  function addToLinkedIn(memberId) {
+    const m    = allMembers.find(x => x.id === memberId);
+    const meta = _linkedInMeta[memberId] || {};
+    const certUrl = `${location.origin}/certificate.html?member=${memberId}`;
+    const p = new URLSearchParams({
+      startTask:        'CERTIFICATION_NAME',
+      name:             'ASBG 수료 인증서',
+      organizationName: 'AWS Student Builders Group',
+      certUrl,
+    });
+    if (meta.year)  p.set('issueYear',  meta.year);
+    if (meta.month) p.set('issueMonth', meta.month);
+    window.open('https://www.linkedin.com/profile/add?' + p.toString(), '_blank');
+  }
+
+  // ── IPFS 메타데이터 로드 ────────────────────────────────────────────────
+  async function fetchIpfsMeta(m, onDate) {
+    if (!m.token_uri) return;
     try {
       const cid = m.token_uri.replace('ipfs://', '');
       const res = await fetch(`https://ipfs.io/ipfs/${cid}`);
       if (!res.ok) return;
-      const meta = await res.json();
+      const meta      = await res.json();
       const issuedAttr = meta.attributes?.find(a => a.trait_type === 'issued_date');
-      const el = document.getElementById('modal-issued-date');
-      if (el) el.textContent = issuedAttr?.value ?? '—';
-    } catch { /* IPFS fetch 실패 시 무시 */ }
+      const dateStr   = issuedAttr?.value ?? '';
+      const [year, month] = dateStr.split('-');
+      _linkedInMeta[m.id] = { year, month: month ? String(parseInt(month, 10)) : '' };
+      onDate(dateStr || '—');
+    } catch { /* IPFS 접근 실패 시 무시 */ }
   }
 
-  // ── 유틸 ────────────────────────────────────────────────────────────────
+  function fetchIpfsMetaForModal(m) {
+    fetchIpfsMeta(m, date => {
+      const el = document.getElementById('modal-issued-date');
+      if (el) el.textContent = date;
+    });
+  }
+
+  function fetchIpfsMetaForShare(m) {
+    fetchIpfsMeta(m, date => {
+      const el = document.getElementById('share-issued-date');
+      if (el) el.textContent = date;
+    });
+  }
+
+  // ── URL 복사 ─────────────────────────────────────────────────────────────
+  async function copyUrl(url) {
+    try {
+      await navigator.clipboard.writeText(url);
+      ['copy-btn', 'modal-copy-btn'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = '✅ 복사됨'; setTimeout(() => el.textContent = '📋 URL 복사', 2000); }
+      });
+    } catch {
+      prompt('아래 URL을 복사하세요:', url);
+    }
+  }
+
+  // ── 유틸 ─────────────────────────────────────────────────────────────────
   function roleBadge(role) {
     if (role === 'Leader')      return 'badge-leader';
     if (role === 'Core Member') return 'badge-core-member';
@@ -392,7 +553,7 @@
     return '👤';
   }
 
-  load();
+  init();
 </script>
 </body>
 </html>

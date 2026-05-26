@@ -8,7 +8,7 @@ region = "ap-northeast-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_NAMED_IAM"
 disable_rollback = true
-parameter_overrides = "TotalSessions=\"10\""
+parameter_overrides = "TotalSessions=\"10\" CloudFrontURL=\"https://d28so472w8zwnc.cloudfront.net\""
 image_repositories = []
 
 [default.global.parameters]

@@ -184,7 +184,13 @@ func main() {
 	}
 
 	issuedDate := time.Now().Format("2006-01-02")
-	credURL := fmt.Sprintf("https://sepolia.etherscan.io/token/%s?a=", certAddr)
+	cloudfrontURL := os.Getenv("CLOUDFRONT_URL")
+	var credURL string
+	if cloudfrontURL != "" {
+		credURL = fmt.Sprintf("%s/certificate.html?member=%d", cloudfrontURL, m.ID)
+	} else {
+		credURL = fmt.Sprintf("https://sepolia.etherscan.io/token/%s?a=%d", certAddr, m.ID)
+	}
 
 	meta := metadata.Build(metadata.CertParams{
 		MemberName:      m.Name,

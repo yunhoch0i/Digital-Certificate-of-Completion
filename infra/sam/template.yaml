@@ -8,6 +8,10 @@ Parameters:
     Type: Number
     Default: 10
     Description: 이번 시즌 전체 모임 횟수
+  CloudFrontURL:
+    Type: String
+    Default: ""
+    Description: "CloudFront URL (첫 배포 후 samconfig.toml에 기입 후 재배포)"
 
 Globals:
   Function:
@@ -19,6 +23,7 @@ Globals:
         CLUB_NAME: "AWS Student Builders Group"
         DATA_BUCKET: !Ref DataBucket
         TOTAL_SESSIONS: !Ref TotalSessions
+        CLOUDFRONT_URL: !Ref CloudFrontURL
 
 Resources:
 
