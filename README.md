@@ -30,7 +30,7 @@ NFT 수료 인증서를 자동 발급하는 시스템입니다.
                  POST /mint
                           │
                           ▼
-                 AWS Secrets Manager
+                 AWS SSM Parameter Store
                  (PRIVATE_KEY 등 민감 정보)
                           │
            ┌──────────────┼──────────────┐
@@ -57,7 +57,7 @@ NFT 수료 인증서를 자동 발급하는 시스템입니다.
 | 테스트넷 | Ethereum Sepolia (Chain ID: 11155111) |
 | RPC | Alchemy Sepolia |
 | NFT 메타데이터 | IPFS (Pinata API) |
-| 클라우드 | AWS 서버리스 (Lambda, API Gateway, S3, CloudFront, DynamoDB, Secrets Manager) |
+| 클라우드 | AWS 서버리스 (Lambda, API Gateway, S3, CloudFront, DynamoDB, SSM Parameter Store) |
 | IaC | AWS SAM |
 | CI/CD | GitHub Actions (OIDC) |
 
@@ -118,7 +118,7 @@ threshold = ceil(TOTAL_SESSIONS × 0.9)
 │   ├── ipfs/           # Pinata 메타데이터 업로드
 │   ├── members/        # members.csv 로드 (로컬 / S3)
 │   ├── metadata/       # NFT 메타데이터 빌더
-│   ├── secret/         # AWS Secrets Manager 조회
+│   ├── secret/         # AWS SSM Parameter Store 조회
 │   └── store/          # DynamoDB tx_history 기록
 ├── infra/sam/
 │   ├── template.yaml   # SAM 인프라 정의
@@ -142,7 +142,7 @@ threshold = ceil(TOTAL_SESSIONS × 0.9)
 | Lambda | `asbg-dashboard` | 출석 민팅 API |
 | Lambda | `asbg-job` | 수료 확인 + 인증서 발행 |
 | EventBridge | `asbg-yearly` | 매년 12월 31일 Job 자동 실행 |
-| Secrets Manager | `asbg/*` | 민감 환경변수 |
+| SSM Parameter Store | `asbg/*` | 민감 환경변수 |
 | DynamoDB | `asbg-tx-history` | 트랜잭션 로그 |
 | IAM Role | `asbg-lambda-role` | Lambda 실행 권한 |
 
@@ -167,7 +167,7 @@ TOTAL_SESSIONS=<세션 횟수>
 PINATA_JWT=<Pinata_JWT>
 ```
 
-### AWS Secrets Manager (Lambda 런타임 주입)
+### AWS SSM Parameter Store (Lambda 런타임 주입)
 
 | 키 | 설명 |
 |---|---|
@@ -325,7 +325,7 @@ main 브랜치에 push
 
 - 프라이빗 키를 코드·로그·커밋에 절대 포함하지 않습니다
 - `.env` 파일은 git에 커밋하지 않습니다
-- Lambda에 `.env` 파일을 직접 업로드하지 않습니다 (Secrets Manager 사용)
+- Lambda에 `.env` 파일을 직접 업로드하지 않습니다 (SSM Parameter Store 사용)
 - `bindings/` 폴더를 직접 수정하지 않습니다 (abigen 재생성)
 - 메인넷 배포를 하지 않습니다 (Sepolia 전용)
 - `members.csv`에 없는 멤버에게 인증서를 발급하지 않습니다
