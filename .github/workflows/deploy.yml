@@ -119,11 +119,16 @@ jobs:
 
       # ── Invalidate CloudFront cache (optional) ───────────────────────────────
       - name: Invalidate CloudFront cache
-        if: ${{ secrets.CF_DISTRIBUTION_ID != '' }}
+        env:
+          CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
         run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.CF_DISTRIBUTION_ID }} \
-            --paths "/*"
+          if [ -n "$CF_DISTRIBUTION_ID" ]; then
+            aws cloudfront create-invalidation \
+              --distribution-id "$CF_DISTRIBUTION_ID" \
+              --paths "/*"
+          else
+            echo "CF_DISTRIBUTION_ID not set — skipping cache invalidation"
+          fi
 
       - name: Deployment summary
         run: |
